@@ -56,6 +56,7 @@ export const SimpleVideosPlayer = ({
   onVideosReady,
 }: VideoPlayerProps) => {
   const { currentTime, setCurrentTime, isPlaying, setIsPlaying } = useTime();
+  
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const [hiddenVideos, setHiddenVideos] = React.useState<string[]>([]);
   const [enlargedVideo, setEnlargedVideo] = React.useState<string | null>(null);
@@ -63,6 +64,11 @@ export const SimpleVideosPlayer = ({
   const [videosReady, setVideosReady] = React.useState(false);
   const [videoObjectUrls, setVideoObjectUrls] = useState<Record<string, string>>({});
   const [loadingVideos, setLoadingVideos] = useState(true);
+  
+  // Track if we're the ones setting the time (to avoid feedback loops)
+  const isSeekingRef = useRef(false);
+  // Track the last time we synced to avoid unnecessary seeks
+  const lastSyncedTimeRef = useRef<number>(-1);
   
   const firstVisibleIdx = videosInfo.findIndex(
     (video) => !hiddenVideos.includes(video.filename)
@@ -202,7 +208,7 @@ export const SimpleVideosPlayer = ({
       setVideosReady(true);
       setIsPlaying(true);
     }
-  }, [loadingVideos, videoObjectUrls]);
+  }, [loadingVideos, videoObjectUrls, setIsPlaying]);
 
   // Handle play/pause
   useEffect(() => {
@@ -213,7 +219,7 @@ export const SimpleVideosPlayer = ({
         if (isPlaying) {
           video.play().catch(e => {
             if (e.name !== 'AbortError') {
-              console.error("Error playing video");
+              console.error('[VideoPlayer] Error playing video:', e);
             }
           });
         } else {
@@ -223,29 +229,66 @@ export const SimpleVideosPlayer = ({
     });
   }, [isPlaying, videosReady, hiddenVideos, videosInfo]);
 
-  // Sync video times
+  // Sync video times - only seek when there's a significant difference
+  // This prevents feedback loops during normal playback
   useEffect(() => {
     if (!videosReady) return;
     
-    videoRefs.current.forEach((video, index) => {
-      if (video && !hiddenVideos.includes(videosInfo[index].filename)) {
-        const info = videosInfo[index];
-        let targetTime = currentTime;
-        
-        if (info.isSegmented) {
-          targetTime = (info.segmentStart || 0) + currentTime;
+    // Skip if we just synced to this time (prevents loops)
+    if (Math.abs(currentTime - lastSyncedTimeRef.current) < 0.01) {
+      return;
+    }
+    
+    const firstVideo = videoRefs.current[firstVisibleIdx];
+    if (!firstVideo) return;
+    
+    const info = videosInfo[firstVisibleIdx];
+    let targetTime = currentTime;
+    if (info?.isSegmented) {
+      targetTime = (info.segmentStart || 0) + currentTime;
+    }
+    
+    // Only seek if the difference is significant (more than 0.1 seconds)
+    // This allows natural playback without constant seeking
+    const currentVideoTime = firstVideo.currentTime;
+    const timeDiff = Math.abs(currentVideoTime - targetTime);
+    
+    if (timeDiff > 0.1) {
+      isSeekingRef.current = true;
+      lastSyncedTimeRef.current = currentTime;
+      
+      // Sync all videos
+      videoRefs.current.forEach((video, index) => {
+        if (video && !hiddenVideos.includes(videosInfo[index].filename)) {
+          const vInfo = videosInfo[index];
+          let vTargetTime = currentTime;
+          if (vInfo?.isSegmented) {
+            vTargetTime = (vInfo.segmentStart || 0) + currentTime;
+          }
+          video.currentTime = vTargetTime;
         }
-        
-        if (Math.abs(video.currentTime - targetTime) > 0.2) {
-          video.currentTime = targetTime;
-        }
-      }
-    });
-  }, [currentTime, videosInfo, videosReady, hiddenVideos]);
+      });
+      
+      // Reset seeking flag after a short delay
+      setTimeout(() => {
+        isSeekingRef.current = false;
+      }, 50);
+    }
+  }, [currentTime, videosInfo, videosReady, hiddenVideos, firstVisibleIdx]);
 
   // Handle time update from first visible video
+  // Only update context when video is playing naturally (not when we're seeking)
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.target as HTMLVideoElement;
+    
+    // Don't update context if:
+    // 1. Video is paused (scrubbing mode - slider is source of truth)
+    // 2. Video is seeking (browser is processing a seek)
+    // 3. We just performed a programmatic seek (prevents feedback loop)
+    if (video.paused || video.seeking || isSeekingRef.current) {
+      return;
+    }
+    
     const videoIndex = videoRefs.current.findIndex(ref => ref === video);
     const info = videosInfo[videoIndex];
     
@@ -254,6 +297,9 @@ export const SimpleVideosPlayer = ({
       if (info.isSegmented) {
         globalTime = video.currentTime - (info.segmentStart || 0);
       }
+      
+      // Update the last synced time to prevent the sync effect from seeking back
+      lastSyncedTimeRef.current = globalTime;
       setCurrentTime(globalTime);
     }
   };

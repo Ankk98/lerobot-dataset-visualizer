@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { postParentMessageWithParams } from "@/utils/postParentMessage";
 import { SimpleVideosPlayer } from "@/components/simple-videos-player";
@@ -47,11 +47,19 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
     chartDataGroups,
     episodes,
     task,
+    duration,
   } = data;
+  
+  // Get fps from dataset info (default to 30 if not available)
+  const fps = datasetInfo?.fps || 30;
 
   const [videosReady, setVideosReady] = useState(!videosInfo.length);
   const [chartsReady, setChartsReady] = useState(false);
   const isLoading = !videosReady || !chartsReady;
+  
+  // Memoize callbacks to prevent infinite re-renders/re-fetches
+  const handleVideosReady = useCallback(() => setVideosReady(true), []);
+  const handleChartsReady = useCallback(() => setChartsReady(true), []);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -85,8 +93,12 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
     preloadAdjacent();
   }, [org, dataset, episodeId]);
 
-  // Initialize based on URL time parameter
+  // Initialize based on URL time parameter - only on initial mount
+  // Use a ref to track if we've already initialized from URL
+  const urlInitializedRef = useRef(false);
   useEffect(() => {
+    if (urlInitializedRef.current) return; // Only run once
+    
     const timeParam = searchParams.get("t");
     if (timeParam) {
       const timeValue = parseFloat(timeParam);
@@ -94,6 +106,7 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
         setCurrentTime(timeValue);
       }
     }
+    urlInitializedRef.current = true;
   }, [searchParams, setCurrentTime]);
 
   // sync with parent window hf.co/spaces
@@ -103,25 +116,71 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
     });
   }, []);
 
-  // Initialize page and keyboard listeners
+  // Frame jump amount (5 frames in seconds)
+  const frameJumpAmount = 5 / fps;
+
+  // Use refs to avoid stale closures in keyboard event handler
+  const currentTimeRef = useRef(currentTime);
+  const durationRef = useRef(duration);
+  
   useEffect(() => {
-    // Initialize page based on current episode
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
+  
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
+
+  // Initialize page based on current episode
+  useEffect(() => {
     const episodeIndex = episodes.indexOf(episodeId);
     if (episodeIndex !== -1) {
       setCurrentPage(Math.floor(episodeIndex / pageSize) + 1);
     }
+  }, [episodes, episodeId, pageSize]);
 
-    // Add keyboard event listener
+  // Keyboard shortcuts listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const { key } = e;
+
+      if (key === " ") {
+        e.preventDefault();
+        setIsPlaying((prev: boolean) => !prev);
+      } else if (key === "ArrowLeft") {
+        // Jump backward 5 frames
+        e.preventDefault();
+        setCurrentTime(Math.max(0, currentTimeRef.current - frameJumpAmount));
+      } else if (key === "ArrowRight") {
+        // Jump forward 5 frames
+        e.preventDefault();
+        setCurrentTime(Math.min(durationRef.current, currentTimeRef.current + frameJumpAmount));
+      } else if (key === "ArrowDown" || key === "ArrowUp") {
+        e.preventDefault();
+        const nextEpisodeId = key === "ArrowDown" ? episodeId + 1 : episodeId - 1;
+        const lowestEpisodeId = episodes[0];
+        const highestEpisodeId = episodes[episodes.length - 1];
+
+        if (
+          nextEpisodeId >= lowestEpisodeId &&
+          nextEpisodeId <= highestEpisodeId
+        ) {
+          router.push(`./episode_${nextEpisodeId}`);
+        }
+      }
+    };
+
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [episodes, episodeId, pageSize]);
+  }, [setIsPlaying, setCurrentTime, frameJumpAmount, episodeId, episodes, router]);
 
   // Only update URL ?t= param when the integer second changes
   const lastUrlSecondRef = useRef<number>(-1);
   useEffect(() => {
     if (isPlaying) return;
+    
     const currentSec = Math.floor(currentTime);
     if (currentTime > 0 && lastUrlSecondRef.current !== currentSec) {
       lastUrlSecondRef.current = currentSec;
@@ -138,28 +197,6 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
       });
     }
   }, [isPlaying, currentTime, searchParams]);
-
-  // Handle keyboard shortcuts
-  const handleKeyDown = (e: KeyboardEvent) => {
-    const { key } = e;
-
-    if (key === " ") {
-      e.preventDefault();
-      setIsPlaying((prev: boolean) => !prev);
-    } else if (key === "ArrowDown" || key === "ArrowUp") {
-      e.preventDefault();
-      const nextEpisodeId = key === "ArrowDown" ? episodeId + 1 : episodeId - 1;
-      const lowestEpisodeId = episodes[0];
-      const highestEpisodeId = episodes[episodes.length - 1];
-
-      if (
-        nextEpisodeId >= lowestEpisodeId &&
-        nextEpisodeId <= highestEpisodeId
-      ) {
-        router.push(`./episode_${nextEpisodeId}`);
-      }
-    }
-  };
 
   // Pagination functions
   const nextPage = () => {
@@ -225,7 +262,7 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
           <SimpleVideosPlayer
             key={episodeId}
             videosInfo={videosInfo}
-            onVideosReady={() => setVideosReady(true)}
+            onVideosReady={handleVideosReady}
           />
         )}
 
@@ -250,12 +287,12 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
           <DataRecharts
             key={episodeId}
             data={chartDataGroups}
-            onChartsReady={() => setChartsReady(true)}
+            onChartsReady={handleChartsReady}
           />
 
         </div>
 
-        <PlaybackBar />
+        <PlaybackBar fps={fps} />
       </div>
     </div>
   );
