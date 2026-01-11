@@ -96,11 +96,25 @@ export const SimpleVideosPlayer = ({
         if (isMounted) {
           setVideoObjectUrls(objectUrls);
           setLoadingVideos(false);
+          // Call onVideosReady immediately after videos are fetched
+          // The video elements will handle their own initialization
+          if (onVideosReady) {
+            // Use a small delay to ensure video elements are rendered
+            setTimeout(() => {
+              onVideosReady();
+            }, 100);
+          }
         }
       } catch (error) {
         console.error('Error loading videos:', error);
         if (isMounted) {
           setLoadingVideos(false);
+          // Even on error, call onVideosReady to unblock the UI
+          if (onVideosReady) {
+            setTimeout(() => {
+              onVideosReady();
+            }, 100);
+          }
         }
       }
     }
@@ -114,7 +128,7 @@ export const SimpleVideosPlayer = ({
         if (url) URL.revokeObjectURL(url);
       });
     };
-  }, [videosInfo]);
+  }, [videosInfo, onVideosReady]);
 
   // Initialize video refs array
   useEffect(() => {
@@ -123,17 +137,6 @@ export const SimpleVideosPlayer = ({
 
   // Handle videos ready
   useEffect(() => {
-    let readyCount = 0;
-    
-    const checkReady = () => {
-      readyCount++;
-      if (readyCount === videosInfo.length && onVideosReady) {
-        setVideosReady(true);
-        onVideosReady();
-        setIsPlaying(true);
-      }
-    };
-
     videoRefs.current.forEach((video, index) => {
       if (video) {
         const info = videosInfo[index];
@@ -155,7 +158,6 @@ export const SimpleVideosPlayer = ({
           
           const handleLoadedData = () => {
             video.currentTime = info.segmentStart || 0;
-            checkReady();
           };
           
           video.addEventListener('timeupdate', handleTimeUpdate);
@@ -176,7 +178,6 @@ export const SimpleVideosPlayer = ({
           };
           
           video.addEventListener('ended', handleEnded);
-          video.addEventListener('canplaythrough', checkReady, { once: true });
           
           // Store cleanup
           (video as any)._segmentHandlers = () => {
@@ -193,7 +194,15 @@ export const SimpleVideosPlayer = ({
         }
       });
     };
-  }, [videosInfo, onVideosReady, setIsPlaying, firstVisibleIdx, setCurrentTime]);
+  }, [videosInfo, firstVisibleIdx, setCurrentTime]);
+
+  // Auto-play videos when they become ready
+  useEffect(() => {
+    if (!loadingVideos && Object.keys(videoObjectUrls).length > 0) {
+      setVideosReady(true);
+      setIsPlaying(true);
+    }
+  }, [loadingVideos, videoObjectUrls]);
 
   // Handle play/pause
   useEffect(() => {

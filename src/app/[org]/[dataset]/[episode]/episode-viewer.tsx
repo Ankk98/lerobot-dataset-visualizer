@@ -33,7 +33,7 @@ export default function EpisodeViewer({
     );
   }
   return (
-    <TimeProvider duration={data.duration}>
+    <TimeProvider key={data.episodeId} duration={data.duration}>
       <EpisodeViewerInner data={data} org={org} dataset={dataset} />
     </TimeProvider>
   );
@@ -223,6 +223,7 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
         {/* Videos */}
         {videosInfo.length && (
           <SimpleVideosPlayer
+            key={episodeId}
             videosInfo={videosInfo}
             onVideosReady={() => setVideosReady(true)}
           />
@@ -247,6 +248,7 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
         {/* Graph */}
         <div className="mb-4">
           <DataRecharts
+            key={episodeId}
             data={chartDataGroups}
             onChartsReady={() => setChartsReady(true)}
           />
