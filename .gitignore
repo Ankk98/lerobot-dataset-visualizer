@@ -25,6 +25,15 @@
 .DS_Store
 *.pem
 
+# local datasets
+/public/datasets/*
+!/public/datasets/.gitkeep
+
+# python virtual environment
+venv/
+*.pyc
+__pycache__/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

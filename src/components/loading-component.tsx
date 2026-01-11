@@ -7,6 +7,7 @@ export default function Loading() {
       tabIndex={-1}
       aria-modal="true"
       role="dialog"
+      suppressHydrationWarning
     >
       <svg
         className="animate-spin mb-8"
@@ -15,6 +16,7 @@ export default function Loading() {
         viewBox="0 0 24 24"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
+        suppressHydrationWarning
       >
         <circle
           className="opacity-25"
@@ -30,8 +32,12 @@ export default function Loading() {
           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
         />
       </svg>
-      <h1 className="text-2xl font-bold mb-2">Loading...</h1>
-      <p className="text-slate-400">preparing data & videos</p>
+      <h1 className="text-2xl font-bold mb-2" suppressHydrationWarning>
+        Loading...
+      </h1>
+      <p className="text-slate-400" suppressHydrationWarning>
+        preparing data & videos
+      </p>
     </div>
   );
 }

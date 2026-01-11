@@ -80,7 +80,7 @@ export async function getAdjacentEpisodesVideoInfo(
                 });
                 return {
                   filename: key,
-                  url: buildVersionedUrl(repoId, version, videoPath),
+                  url: buildVersionedUrl(repoId, version, videoPath, true), // forBrowser: true for video URLs
                 };
               });
           }
@@ -140,7 +140,7 @@ async function getEpisodeDataV2(
       });
       return {
         filename: key,
-        url: buildVersionedUrl(repoId, version, videoPath),
+        url: buildVersionedUrl(repoId, version, videoPath, true), // forBrowser: true for video URLs
       };
     });
 
@@ -914,7 +914,7 @@ function extractVideoInfoV3WithSegmentation(
     }
     
     const videoPath = `videos/${videoKey}/chunk-${chunkIndex.toString().padStart(3, "0")}/file-${fileIndex.toString().padStart(3, "0")}.mp4`;
-    const fullUrl = buildVersionedUrl(repoId, version, videoPath);
+    const fullUrl = buildVersionedUrl(repoId, version, videoPath, true); // forBrowser: true for video URLs
     
     return {
       filename: videoKey,

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useTime } from "../context/time-context";
 import { FaExpand, FaCompress, FaTimes, FaEye } from "react-icons/fa";
 
@@ -18,6 +18,39 @@ type VideoPlayerProps = {
   onVideosReady?: () => void;
 };
 
+// Helper to fetch video and create object URL
+async function fetchAuthenticatedVideo(url: string): Promise<string> {
+  // Check if it's a local file or pre-signed URL
+  const isLocal = url.startsWith('/');
+  const isPresigned = url.includes('X-Amz-Signature') || url.includes('cas-bridge.xethub.hf.co');
+  
+  // For local files, just return the URL directly - Next.js will serve it
+  if (isLocal) {
+    return url;
+  }
+  
+  // Only add auth for remote HuggingFace URLs (not local, not pre-signed)
+  const needsAuth = !isLocal && !isPresigned;
+  const token = process.env.NEXT_PUBLIC_HF_TOKEN;
+  const headers: HeadersInit = (needsAuth && token) ? {
+    'Authorization': `Bearer ${token}`
+  } : {};
+
+  try {
+    const response = await fetch(url, { headers });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch video: ${response.status} ${response.statusText}`);
+    }
+    
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  } catch (error) {
+    console.error('[Video Loading] Error:', error);
+    throw error;
+  }
+}
+
 export const SimpleVideosPlayer = ({
   videosInfo,
   onVideosReady,
@@ -28,10 +61,60 @@ export const SimpleVideosPlayer = ({
   const [enlargedVideo, setEnlargedVideo] = React.useState<string | null>(null);
   const [showHiddenMenu, setShowHiddenMenu] = React.useState(false);
   const [videosReady, setVideosReady] = React.useState(false);
+  const [videoObjectUrls, setVideoObjectUrls] = useState<Record<string, string>>({});
+  const [loadingVideos, setLoadingVideos] = useState(true);
   
   const firstVisibleIdx = videosInfo.findIndex(
     (video) => !hiddenVideos.includes(video.filename)
   );
+
+  // Fetch videos with authentication and create object URLs
+  useEffect(() => {
+    let isMounted = true;
+    const objectUrls: Record<string, string> = {};
+
+    async function loadVideos() {
+      try {
+        setLoadingVideos(true);
+        
+        // Fetch all videos in parallel
+        const videoPromises = videosInfo.map(async (info) => {
+          try {
+            const objectUrl = await fetchAuthenticatedVideo(info.url);
+            if (isMounted) {
+              objectUrls[info.filename] = objectUrl;
+            }
+            return objectUrl;
+          } catch (error) {
+            console.error(`Failed to load video ${info.filename}:`, error);
+            return null;
+          }
+        });
+
+        await Promise.all(videoPromises);
+        
+        if (isMounted) {
+          setVideoObjectUrls(objectUrls);
+          setLoadingVideos(false);
+        }
+      } catch (error) {
+        console.error('Error loading videos:', error);
+        if (isMounted) {
+          setLoadingVideos(false);
+        }
+      }
+    }
+
+    loadVideos();
+
+    // Cleanup: revoke object URLs when component unmounts
+    return () => {
+      isMounted = false;
+      Object.values(objectUrls).forEach(url => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    };
+  }, [videosInfo]);
 
   // Initialize video refs array
   useEffect(() => {
@@ -179,6 +262,27 @@ export const SimpleVideosPlayer = ({
     video.play();
   };
 
+  // Show loading state while videos are being fetched
+  if (loadingVideos || Object.keys(videoObjectUrls).length === 0) {
+    return (
+      <div className="flex flex-wrap gap-x-2 gap-y-6">
+        {videosInfo.map((info) => (
+          <div key={info.filename} className="max-w-96">
+            <p className="truncate w-full rounded-t-xl bg-gray-800 px-2 text-sm text-gray-300">
+              {info.filename}
+            </p>
+            <div className="w-full h-64 bg-slate-900 flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                <p className="text-slate-400">Loading video...</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <>
       {/* Hidden videos menu */}
@@ -216,6 +320,9 @@ export const SimpleVideosPlayer = ({
           
           const isEnlarged = enlargedVideo === info.filename;
           const isFirstVisible = idx === firstVisibleIdx;
+          const videoSrc = videoObjectUrls[info.filename];
+          
+          if (!videoSrc) return null; // Skip if video hasn't loaded yet
           
           return (
             <div
@@ -255,8 +362,8 @@ export const SimpleVideosPlayer = ({
                 preload="auto"
                 onPlay={(e) => handlePlay(e.currentTarget, info)}
                 onTimeUpdate={isFirstVisible ? handleTimeUpdate : undefined}
+                src={videoSrc}
               >
-                <source src={info.url} type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
             </div>

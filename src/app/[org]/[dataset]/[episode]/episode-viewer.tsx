@@ -94,7 +94,7 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
         setCurrentTime(timeValue);
       }
     }
-  }, []);
+  }, [searchParams, setCurrentTime]);
 
   // sync with parent window hf.co/spaces
   useEffect(() => {
@@ -103,7 +103,7 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
     });
   }, []);
 
-  // Initialize based on URL time parameter
+  // Initialize page and keyboard listeners
   useEffect(() => {
     // Initialize page based on current episode
     const episodeIndex = episodes.indexOf(episodeId);
@@ -116,7 +116,7 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [episodes, episodeId, pageSize, searchParams]);
+  }, [episodes, episodeId, pageSize]);
 
   // Only update URL ?t= param when the integer second changes
   const lastUrlSecondRef = useRef<number>(-1);
