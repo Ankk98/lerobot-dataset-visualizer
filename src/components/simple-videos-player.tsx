@@ -320,9 +320,9 @@ export const SimpleVideosPlayer = ({
   // Show loading state while videos are being fetched
   if (loadingVideos || Object.keys(videoObjectUrls).length === 0) {
     return (
-      <div className="flex flex-wrap gap-x-2 gap-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-6">
         {videosInfo.map((info) => (
-          <div key={info.filename} className="max-w-96">
+          <div key={info.filename} className="w-full">
             <p className="truncate w-full rounded-t-xl bg-gray-800 px-2 text-sm text-gray-300">
               {info.filename}
             </p>
@@ -369,7 +369,7 @@ export const SimpleVideosPlayer = ({
       )}
 
       {/* Videos */}
-      <div className="flex flex-wrap gap-x-2 gap-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-6">
         {videosInfo.map((info, idx) => {
           if (hiddenVideos.includes(info.filename)) return null;
           
@@ -385,7 +385,7 @@ export const SimpleVideosPlayer = ({
               className={`${
                 isEnlarged
                   ? "z-40 fixed inset-0 bg-black bg-opacity-90 flex flex-col items-center justify-center"
-                  : "max-w-96"
+                  : "w-full"
               }`}
             >
               <p className="truncate w-full rounded-t-xl bg-gray-800 px-2 text-sm text-gray-300 flex items-center justify-between">
