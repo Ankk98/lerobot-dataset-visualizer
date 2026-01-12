@@ -67,6 +67,13 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
   // State
   // Use context for time sync
   const { currentTime, setCurrentTime, setIsPlaying, isPlaying } = useTime();
+  
+  // Refs for keyboard shortcuts
+  const toggleSidebarRef = useRef<(() => void) | null>(null);
+  const expandVideoRef = useRef<((filename: string | null) => void) | null>(null);
+  
+  // Keyboard shortcuts help display
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   // Pagination state
   const pageSize = 100;
@@ -142,20 +149,32 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
   // Keyboard shortcuts listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const { key } = e;
+      // Ignore if user is typing in an input field
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
 
+      const { key, ctrlKey, metaKey, shiftKey } = e;
+      const isModifier = ctrlKey || metaKey;
+
+      // Space: Play/Pause
       if (key === " ") {
         e.preventDefault();
         setIsPlaying((prev: boolean) => !prev);
-      } else if (key === "ArrowLeft") {
-        // Jump backward 5 frames
+      }
+      // ArrowLeft: Jump backward 3 seconds
+      else if (key === "ArrowLeft" && !isModifier) {
         e.preventDefault();
-        setCurrentTime(Math.max(0, currentTimeRef.current - frameJumpAmount));
-      } else if (key === "ArrowRight") {
-        // Jump forward 5 frames
+        setCurrentTime(Math.max(0, currentTimeRef.current - 3));
+      }
+      // ArrowRight: Jump forward 3 seconds
+      else if (key === "ArrowRight" && !isModifier) {
         e.preventDefault();
-        setCurrentTime(Math.min(durationRef.current, currentTimeRef.current + frameJumpAmount));
-      } else if (key === "ArrowDown" || key === "ArrowUp") {
+        setCurrentTime(Math.min(durationRef.current, currentTimeRef.current + 3));
+      }
+      // ArrowDown/ArrowUp: Navigate episodes
+      else if ((key === "ArrowDown" || key === "ArrowUp") && !isModifier) {
         e.preventDefault();
         const nextEpisodeId = key === "ArrowDown" ? episodeId + 1 : episodeId - 1;
         const lowestEpisodeId = episodes[0];
@@ -168,13 +187,74 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
           router.push(`./episode_${nextEpisodeId}`);
         }
       }
+      // B: Toggle sidebar
+      else if (key === "b" || key === "B") {
+        e.preventDefault();
+        if (toggleSidebarRef.current) {
+          toggleSidebarRef.current();
+        }
+      }
+      // R or Home: Restart playback (go to beginning)
+      else if (key === "r" || key === "R" || key === "Home") {
+        e.preventDefault();
+        setCurrentTime(0);
+      }
+      // 1: Expand left video
+      else if (key === "1") {
+        e.preventDefault();
+        const leftVideo = videosInfo.find(v => v.filename === "observation.images.left");
+        if (leftVideo && expandVideoRef.current) {
+          expandVideoRef.current(leftVideo.filename);
+        }
+      }
+      // 2: Expand top video
+      else if (key === "2") {
+        e.preventDefault();
+        const topVideo = videosInfo.find(v => v.filename === "observation.images.top");
+        if (topVideo && expandVideoRef.current) {
+          expandVideoRef.current(topVideo.filename);
+        }
+      }
+      // 3: Expand right video
+      else if (key === "3") {
+        e.preventDefault();
+        const rightVideo = videosInfo.find(v => v.filename === "observation.images.right");
+        if (rightVideo && expandVideoRef.current) {
+          expandVideoRef.current(rightVideo.filename);
+        }
+      }
+      // 0 or Escape: Minimize/close expanded video
+      else if (key === "0" || key === "Escape") {
+        if (expandVideoRef.current) {
+          expandVideoRef.current(null);
+        }
+        // Also close shortcuts help if open
+        if (showShortcuts) {
+          setShowShortcuts(false);
+        }
+      }
+      // ? or H: Show/hide keyboard shortcuts help
+      else if (key === "?" || key === "h" || key === "H") {
+        e.preventDefault();
+        setShowShortcuts((prev) => !prev);
+      }
+      // Shift+ArrowLeft: Jump backward 1 second
+      else if (key === "ArrowLeft" && shiftKey) {
+        e.preventDefault();
+        setCurrentTime(Math.max(0, currentTimeRef.current - 1));
+      }
+      // Shift+ArrowRight: Jump forward 1 second
+      else if (key === "ArrowRight" && shiftKey) {
+        e.preventDefault();
+        setCurrentTime(Math.min(durationRef.current, currentTimeRef.current + 1));
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [setIsPlaying, setCurrentTime, frameJumpAmount, episodeId, episodes, router]);
+  }, [setIsPlaying, setCurrentTime, frameJumpAmount, episodeId, episodes, router, videosInfo, showShortcuts]);
 
   // Only update URL ?t= param when the integer second changes
   const lastUrlSecondRef = useRef<number>(-1);
@@ -222,6 +302,7 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
         currentPage={currentPage}
         prevPage={prevPage}
         nextPage={nextPage}
+        toggleSidebarRef={toggleSidebarRef}
       />
 
       {/* Content */}
@@ -230,32 +311,93 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
       >
         {isLoading && <Loading />}
 
-        <div className="flex items-center justify-start my-4">
-          <a
-            href="https://github.com/huggingface/lerobot"
-            target="_blank"
-            className="block"
-          >
-            <img
-              src="https://github.com/huggingface/lerobot/raw/main/media/lerobot-logo-thumbnail.png"
-              alt="LeRobot Logo"
-              className="w-32"
-            />
-          </a>
-
-          <div>
+        <div className="flex items-center justify-between my-4">
+          <div className="flex items-center justify-start">
             <a
-              href={`https://huggingface.co/datasets/${datasetInfo.repoId}`}
-              target="_blank"
+              href="https://github.com/huggingface/lerobot"
+                target="_blank"
+              className="block"
             >
-              <p className="text-lg font-semibold">{datasetInfo.repoId}</p>
+              <img
+                src="https://github.com/huggingface/lerobot/raw/main/media/lerobot-logo-thumbnail.png"
+                alt="LeRobot Logo"
+                className="w-32"
+              />
             </a>
 
-            <p className="font-mono text-lg font-semibold">
-              episode {episodeId}
-            </p>
+            <div>
+              <a
+                href={`https://huggingface.co/datasets/${datasetInfo.repoId}`}
+                target="_blank"
+              >
+                <p className="text-lg font-semibold">{datasetInfo.repoId}</p>
+              </a>
+
+              <p className="font-mono text-lg font-semibold">
+                episode {episodeId}
+              </p>
+            </div>
           </div>
+          
+          <button
+            onClick={() => setShowShortcuts(!showShortcuts)}
+            className="px-3 py-1 text-sm bg-slate-800 hover:bg-slate-700 rounded border border-slate-600 text-slate-300"
+            title="Keyboard shortcuts (Press ? or H)"
+          >
+            ⌨️ Shortcuts
+          </button>
         </div>
+        
+        {/* Keyboard Shortcuts Help */}
+        {showShortcuts && (
+          <div className="mb-4 p-4 bg-slate-800 rounded-lg border border-slate-600">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-semibold text-slate-100">Keyboard Shortcuts</h3>
+              <button
+                onClick={() => setShowShortcuts(false)}
+                className="text-slate-400 hover:text-slate-200"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="font-semibold text-slate-200 mb-2">Playback</p>
+                <ul className="space-y-1 text-slate-300">
+                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">Space</kbd> - Play/Pause</li>
+                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">R</kbd> or <kbd className="px-2 py-1 bg-slate-700 rounded">Home</kbd> - Restart</li>
+                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">←</kbd> - Back 3 seconds</li>
+                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">→</kbd> - Forward 3 seconds</li>
+                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">Shift + ←</kbd> - Back 1 second</li>
+                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">Shift + →</kbd> - Forward 1 second</li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-semibold text-slate-200 mb-2">Navigation</p>
+                <ul className="space-y-1 text-slate-300">
+                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">↑</kbd> - Previous episode</li>
+                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">↓</kbd> - Next episode</li>
+                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">B</kbd> - Toggle sidebar</li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-semibold text-slate-200 mb-2">Video Controls</p>
+                <ul className="space-y-1 text-slate-300">
+                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">1</kbd> - Expand left video</li>
+                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">2</kbd> - Expand top video</li>
+                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">3</kbd> - Expand right video</li>
+                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">0</kbd> or <kbd className="px-2 py-1 bg-slate-700 rounded">Esc</kbd> - Minimize video</li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-semibold text-slate-200 mb-2">Help</p>
+                <ul className="space-y-1 text-slate-300">
+                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">?</kbd> or <kbd className="px-2 py-1 bg-slate-700 rounded">H</kbd> - Show/hide this help</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Videos */}
         {videosInfo.length && (
@@ -263,6 +405,7 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
             key={episodeId}
             videosInfo={videosInfo}
             onVideosReady={handleVideosReady}
+            expandedVideoRef={expandVideoRef}
           />
         )}
 

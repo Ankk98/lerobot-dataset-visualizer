@@ -16,6 +16,8 @@ type VideoInfo = {
 type VideoPlayerProps = {
   videosInfo: VideoInfo[];
   onVideosReady?: () => void;
+  onExpandVideo?: (filename: string | null) => void;
+  expandedVideoRef?: React.MutableRefObject<((filename: string | null) => void) | null>;
 };
 
 // Helper to fetch video and create object URL
@@ -54,12 +56,28 @@ async function fetchAuthenticatedVideo(url: string): Promise<string> {
 export const SimpleVideosPlayer = ({
   videosInfo,
   onVideosReady,
+  onExpandVideo,
+  expandedVideoRef,
 }: VideoPlayerProps) => {
   const { currentTime, setCurrentTime, isPlaying, setIsPlaying } = useTime();
   
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const [hiddenVideos, setHiddenVideos] = React.useState<string[]>([]);
   const [enlargedVideo, setEnlargedVideo] = React.useState<string | null>(null);
+  
+  // Expose expand function via ref for keyboard shortcuts
+  const handleExpandVideo = React.useCallback((filename: string | null) => {
+    setEnlargedVideo(filename);
+    if (onExpandVideo) {
+      onExpandVideo(filename);
+    }
+  }, [onExpandVideo]);
+  
+  React.useEffect(() => {
+    if (expandedVideoRef) {
+      expandedVideoRef.current = handleExpandVideo;
+    }
+  }, [expandedVideoRef, handleExpandVideo]);
   const [showHiddenMenu, setShowHiddenMenu] = React.useState(false);
   const [videosReady, setVideosReady] = React.useState(false);
   const [videoObjectUrls, setVideoObjectUrls] = useState<Record<string, string>>({});
@@ -394,7 +412,7 @@ export const SimpleVideosPlayer = ({
                   <button
                     title={isEnlarged ? "Minimize" : "Enlarge"}
                     className="ml-2 p-1 hover:bg-slate-700 rounded"
-                    onClick={() => setEnlargedVideo(isEnlarged ? null : info.filename)}
+                    onClick={() => handleExpandVideo(isEnlarged ? null : info.filename)}
                   >
                     {isEnlarged ? <FaCompress /> : <FaExpand />}
                   </button>

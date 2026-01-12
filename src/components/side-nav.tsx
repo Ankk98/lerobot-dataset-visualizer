@@ -11,6 +11,7 @@ interface SidebarProps {
   currentPage: number;
   prevPage: () => void;
   nextPage: () => void;
+  toggleSidebarRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -21,9 +22,17 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentPage,
   prevPage,
   nextPage,
+  toggleSidebarRef,
 }) => {
   const [sidebarVisible, setSidebarVisible] = React.useState(true);
-  const toggleSidebar = () => setSidebarVisible((prev) => !prev);
+  const toggleSidebar = React.useCallback(() => setSidebarVisible((prev) => !prev), []);
+  
+  // Expose toggle function via ref for keyboard shortcuts
+  React.useEffect(() => {
+    if (toggleSidebarRef) {
+      toggleSidebarRef.current = toggleSidebar;
+    }
+  }, [toggleSidebarRef, toggleSidebar]);
 
   const sidebarRef = React.useRef<HTMLDivElement>(null);
 
