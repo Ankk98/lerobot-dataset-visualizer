@@ -83,6 +83,28 @@ export async function getAdjacentEpisodesVideoInfo(
                   url: buildVersionedUrl(repoId, version, videoPath, true), // forBrowser: true for video URLs
                 };
               });
+            
+            // Sort videos to ensure correct order: left, top, right
+            const videoOrder = [
+              'observation.images.left',
+              'observation.images.top',
+              'observation.images.right'
+            ];
+            
+            videosInfo.sort((a, b) => {
+              const indexA = videoOrder.indexOf(a.filename);
+              const indexB = videoOrder.indexOf(b.filename);
+              
+              // If both are in the order list, sort by their position
+              if (indexA !== -1 && indexB !== -1) {
+                return indexA - indexB;
+              }
+              // If only one is in the list, prioritize it
+              if (indexA !== -1) return -1;
+              if (indexB !== -1) return 1;
+              // If neither is in the list, maintain original order
+              return 0;
+            });
           }
           
           adjacentVideos.push({ episodeId, videosInfo });
@@ -142,6 +164,28 @@ async function getEpisodeDataV2(
         filename: key,
         url: buildVersionedUrl(repoId, version, videoPath, true), // forBrowser: true for video URLs
       };
+    });
+
+    // Sort videos to ensure correct order: left, top, right
+    const videoOrder = [
+      'observation.images.left',
+      'observation.images.top',
+      'observation.images.right'
+    ];
+    
+    videosInfo.sort((a, b) => {
+      const indexA = videoOrder.indexOf(a.filename);
+      const indexB = videoOrder.indexOf(b.filename);
+      
+      // If both are in the order list, sort by their position
+      if (indexA !== -1 && indexB !== -1) {
+        return indexA - indexB;
+      }
+      // If only one is in the list, prioritize it
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      // If neither is in the list, maintain original order
+      return 0;
     });
 
   // Column data
@@ -925,6 +969,28 @@ function extractVideoInfoV3WithSegmentation(
       segmentEnd: segmentEnd,
       segmentDuration: segmentEnd - segmentStart,
     };
+  });
+
+  // Sort videos to ensure correct order: left, top, right
+  const videoOrder = [
+    'observation.images.left',
+    'observation.images.top',
+    'observation.images.right'
+  ];
+  
+  videosInfo.sort((a, b) => {
+    const indexA = videoOrder.indexOf(a.filename);
+    const indexB = videoOrder.indexOf(b.filename);
+    
+    // If both are in the order list, sort by their position
+    if (indexA !== -1 && indexB !== -1) {
+      return indexA - indexB;
+    }
+    // If only one is in the list, prioritize it
+    if (indexA !== -1) return -1;
+    if (indexB !== -1) return 1;
+    // If neither is in the list, maintain original order
+    return 0;
   });
 
   return videosInfo;
