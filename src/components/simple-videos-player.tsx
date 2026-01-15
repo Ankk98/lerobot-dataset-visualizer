@@ -388,60 +388,73 @@ export const SimpleVideosPlayer = ({
 
       {/* Videos */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-6">
-        {videosInfo.map((info, idx) => {
-          if (hiddenVideos.includes(info.filename)) return null;
-          
-          const isEnlarged = enlargedVideo === info.filename;
-          const isFirstVisible = idx === firstVisibleIdx;
-          const videoSrc = videoObjectUrls[info.filename];
-          
-          if (!videoSrc) return null; // Skip if video hasn't loaded yet
-          
-          return (
-            <div
-              key={info.filename}
-              className={`${
-                isEnlarged
-                  ? "col-span-full w-full flex flex-col items-center"
-                  : "w-full"
-              }`}
-            >
-              <p className="truncate w-full rounded-t-xl bg-gray-800 px-2 text-sm text-gray-300 flex items-center justify-between">
-                <span>{info.filename}</span>
-                <span className="flex gap-1">
-                  <button
-                    title={isEnlarged ? "Minimize" : "Enlarge"}
-                    className="ml-2 p-1 hover:bg-slate-700 rounded"
-                    onClick={() => handleExpandVideo(isEnlarged ? null : info.filename)}
-                  >
-                    {isEnlarged ? <FaCompress /> : <FaExpand />}
-                  </button>
-                  <button
-                    title="Hide Video"
-                    className="ml-1 p-1 hover:bg-slate-700 rounded"
-                    onClick={() => setHiddenVideos(prev => [...prev, info.filename])}
-                    disabled={videosInfo.filter(v => !hiddenVideos.includes(v.filename)).length === 1}
-                  >
-                    <FaTimes />
-                  </button>
-                </span>
-              </p>
-              <video
-                ref={el => videoRefs.current[idx] = el}
-                className={`w-full object-contain ${
-                  isEnlarged ? "max-h-[70vh]" : ""
+        {(() => {
+          // Sort videos: expanded video first, then others in original order
+          const sortedVideos = [...videosInfo].sort((a, b) => {
+            const aEnlarged = enlargedVideo === a.filename;
+            const bEnlarged = enlargedVideo === b.filename;
+            if (aEnlarged && !bEnlarged) return -1;
+            if (!aEnlarged && bEnlarged) return 1;
+            return 0; // Keep original order for non-enlarged videos
+          });
+
+          return sortedVideos.map((info, sortedIdx) => {
+            if (hiddenVideos.includes(info.filename)) return null;
+            
+            // Find original index for video refs and firstVisibleIdx
+            const originalIdx = videosInfo.findIndex(v => v.filename === info.filename);
+            const isEnlarged = enlargedVideo === info.filename;
+            const isFirstVisible = originalIdx === firstVisibleIdx;
+            const videoSrc = videoObjectUrls[info.filename];
+            
+            if (!videoSrc) return null; // Skip if video hasn't loaded yet
+            
+            return (
+              <div
+                key={info.filename}
+                className={`${
+                  isEnlarged
+                    ? "col-span-full w-full flex flex-col items-center"
+                    : "w-full"
                 }`}
-                muted
-                preload="auto"
-                onPlay={(e) => handlePlay(e.currentTarget, info)}
-                onTimeUpdate={isFirstVisible ? handleTimeUpdate : undefined}
-                src={videoSrc}
               >
-                Your browser does not support the video tag.
-              </video>
-            </div>
-          );
-        })}
+                <p className="truncate w-full rounded-t-xl bg-gray-800 px-2 text-sm text-gray-300 flex items-center justify-between">
+                  <span>{info.filename}</span>
+                  <span className="flex gap-1">
+                    <button
+                      title={isEnlarged ? "Minimize" : "Enlarge"}
+                      className="ml-2 p-1 hover:bg-slate-700 rounded"
+                      onClick={() => handleExpandVideo(isEnlarged ? null : info.filename)}
+                    >
+                      {isEnlarged ? <FaCompress /> : <FaExpand />}
+                    </button>
+                    <button
+                      title="Hide Video"
+                      className="ml-1 p-1 hover:bg-slate-700 rounded"
+                      onClick={() => setHiddenVideos(prev => [...prev, info.filename])}
+                      disabled={videosInfo.filter(v => !hiddenVideos.includes(v.filename)).length === 1}
+                    >
+                      <FaTimes />
+                    </button>
+                  </span>
+                </p>
+                <video
+                  ref={el => videoRefs.current[originalIdx] = el}
+                  className={`w-full object-contain ${
+                    isEnlarged ? "max-h-[70vh]" : ""
+                  }`}
+                  muted
+                  preload="auto"
+                  onPlay={(e) => handlePlay(e.currentTarget, info)}
+                  onTimeUpdate={isFirstVisible ? handleTimeUpdate : undefined}
+                  src={videoSrc}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            );
+          });
+        })()}
       </div>
     </>
   );
