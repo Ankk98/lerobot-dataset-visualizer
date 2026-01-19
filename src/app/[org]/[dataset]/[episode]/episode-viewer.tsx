@@ -123,8 +123,7 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
     });
   }, []);
 
-  // Frame jump amount (5 frames in seconds)
-  const frameJumpAmount = 5 / fps;
+  // Note: Arrow keys jump 1 second (see handleKeyDown below)
 
   // Use refs to avoid stale closures in keyboard event handler
   const currentTimeRef = useRef(currentTime);
@@ -163,15 +162,15 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
         e.preventDefault();
         setIsPlaying((prev: boolean) => !prev);
       }
-      // ArrowLeft: Jump backward 3 seconds
+      // ArrowLeft: Jump backward 1 second
       else if (key === "ArrowLeft" && !isModifier) {
         e.preventDefault();
-        setCurrentTime(Math.max(0, currentTimeRef.current - 3));
+        setCurrentTime(Math.max(0, currentTimeRef.current - 1));
       }
-      // ArrowRight: Jump forward 3 seconds
+      // ArrowRight: Jump forward 1 second
       else if (key === "ArrowRight" && !isModifier) {
         e.preventDefault();
-        setCurrentTime(Math.min(durationRef.current, currentTimeRef.current + 3));
+        setCurrentTime(Math.min(durationRef.current, currentTimeRef.current + 1));
       }
       // ArrowDown/ArrowUp: Navigate episodes
       else if ((key === "ArrowDown" || key === "ArrowUp") && !isModifier) {
@@ -254,7 +253,7 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [setIsPlaying, setCurrentTime, frameJumpAmount, episodeId, episodes, router, videosInfo, showShortcuts]);
+  }, [setIsPlaying, setCurrentTime, episodeId, episodes, router, videosInfo, showShortcuts]);
 
   // Only update URL ?t= param when the integer second changes
   const lastUrlSecondRef = useRef<number>(-1);
@@ -366,8 +365,8 @@ function EpisodeViewerInner({ data, org, dataset }: { data: any; org?: string; d
                 <ul className="space-y-1 text-slate-300">
                   <li><kbd className="px-2 py-1 bg-slate-700 rounded">Space</kbd> - Play/Pause</li>
                   <li><kbd className="px-2 py-1 bg-slate-700 rounded">R</kbd> or <kbd className="px-2 py-1 bg-slate-700 rounded">Home</kbd> - Restart</li>
-                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">←</kbd> - Back 3 seconds</li>
-                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">→</kbd> - Forward 3 seconds</li>
+                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">←</kbd> - Back 1 second</li>
+                  <li><kbd className="px-2 py-1 bg-slate-700 rounded">→</kbd> - Forward 1 second</li>
                   <li><kbd className="px-2 py-1 bg-slate-700 rounded">Shift + ←</kbd> - Back 1 second</li>
                   <li><kbd className="px-2 py-1 bg-slate-700 rounded">Shift + →</kbd> - Forward 1 second</li>
                 </ul>

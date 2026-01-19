@@ -26,7 +26,7 @@ const PlaybackBar: React.FC<PlaybackBarProps> = ({ fps = 30 }) => {
 
   // Calculate frame duration in seconds
   const frameDuration = 1 / fps;
-  const frameJumpAmount = 5 * frameDuration; // 5 frames in seconds
+  const jumpAmount = 1; // 1 second
 
   // Only update sliderValue from context if not dragging
   React.useEffect(() => {
@@ -63,8 +63,8 @@ const PlaybackBar: React.FC<PlaybackBarProps> = ({ fps = 30 }) => {
   return (
     <div className="flex items-center gap-4 w-full max-w-4xl mx-auto sticky bottom-0 bg-slate-900/95 px-4 py-3 rounded-3xl mt-auto">
       <button
-        title="Jump backward 5 frames (←)"
-        onClick={() => setCurrentTime(Math.max(0, currentTime - frameJumpAmount))}
+        title="Jump backward 1 second (←)"
+        onClick={() => setCurrentTime(Math.max(0, currentTime - jumpAmount))}
         className="text-2xl hidden md:block hover:text-orange-400 transition-colors"
       >
         <FaBackward size={24} />
@@ -86,8 +86,8 @@ const PlaybackBar: React.FC<PlaybackBarProps> = ({ fps = 30 }) => {
         <FaPause size={24} />
       </button>
       <button
-        title="Jump forward 5 frames (→)"
-        onClick={() => setCurrentTime(Math.min(duration, currentTime + frameJumpAmount))}
+        title="Jump forward 1 second (→)"
+        onClick={() => setCurrentTime(Math.min(duration, currentTime + jumpAmount))}
         className="text-2xl hidden md:block hover:text-orange-400 transition-colors"
       >
         <FaForward size={24} />
@@ -132,7 +132,7 @@ const PlaybackBar: React.FC<PlaybackBarProps> = ({ fps = 30 }) => {
           <span className="inline-flex items-center gap-1 font-mono align-middle">
             <FaArrowLeft size={14} />/<FaArrowRight size={14} />
           </span>{" "}
-          jump 5 frames
+          jump 1 second
         </p>
         <p>
           <span className="inline-flex items-center gap-1 font-mono align-middle">
