@@ -1,0 +1,18 @@
+# Environment Configuration
+
+# === Remote Mode (Default) ===
+# Works with HuggingFace hosted datasets
+DATASET_URL=https://huggingface.co/datasets
+
+# Optional: HuggingFace token for private datasets
+# Get your token from: https://huggingface.co/settings/tokens
+# NEXT_PUBLIC_HF_TOKEN=hf_your_token_here
+
+# === Local Mode (Optional) ===
+# Enable this to use locally downloaded datasets
+# NEXT_PUBLIC_USE_LOCAL_DATASETS=true
+# NEXT_PUBLIC_LOCAL_DATASETS_PATH=./public/datasets
+
+# === App Settings (Optional) ===
+# REPO_ID=<org>/<dataset>
+# EPISODES=0 1 2 3 4 5

@@ -3,6 +3,8 @@ import { getEpisodeDataSafe } from "./fetch-data";
 import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export async function generateMetadata({
   params,
@@ -27,7 +29,13 @@ export default async function EpisodePage({
   const { data, error } = await getEpisodeDataSafe(org, dataset, episodeNumber);
   return (
     <Suspense fallback={null}>
-      <EpisodeViewer data={data} error={error} />
+      <EpisodeViewer 
+        key={`${org}/${dataset}/${episode}`} 
+        data={data} 
+        error={error} 
+        org={org} 
+        dataset={dataset} 
+      />
     </Suspense>
   );
 }

@@ -24,8 +24,51 @@ export interface DatasetMetadata {
   >;
 }
 
+// Helper to get auth headers for HuggingFace requests (only for remote)
+function getAuthHeaders(): HeadersInit {
+  // Check if URL is local (starts with /)
+  // Local files don't need authentication
+  const token = process.env.NEXT_PUBLIC_HF_TOKEN;
+  if (token) {
+    return {
+      'Authorization': `Bearer ${token}`,
+    };
+  }
+  return {};
+}
+
 export async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+  // Check if it's a local file path
+  const isLocalPath = url.startsWith('./') || url.startsWith('../') || (!url.startsWith('http'));
+  const isLocalUrl = url.startsWith('/');
+  
+  if ((isLocalPath || isLocalUrl) && typeof window === 'undefined') {
+    // Server-side: read from filesystem
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      // Convert paths to absolute filesystem paths
+      let filePath;
+      if (isLocalUrl) {
+        // /datasets/... -> ./public/datasets/...
+        filePath = path.join(process.cwd(), 'public', url);
+      } else {
+        // ./public/datasets/... -> absolute path
+        filePath = path.join(process.cwd(), url);
+      }
+      const fileContent = fs.readFileSync(filePath, 'utf-8');
+      return JSON.parse(fileContent) as T;
+    } catch (error) {
+      throw new Error(
+        `Failed to read local JSON ${url}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+  
+  // Client-side or remote: use fetch
+  const headers = isLocalUrl ? {} : getAuthHeaders();
+  
+  const res = await fetch(url, { headers });
   if (!res.ok) {
     throw new Error(
       `Failed to fetch JSON ${url}: ${res.status} ${res.statusText}`,
@@ -43,7 +86,36 @@ export function formatStringWithVars(
 
 // Fetch and parse the Parquet file
 export async function fetchParquetFile(url: string): Promise<ArrayBuffer> {
-  const res = await fetch(url);
+  const isLocalPath = url.startsWith('./') || url.startsWith('../') || (!url.startsWith('http'));
+  const isLocalUrl = url.startsWith('/');
+  
+  if ((isLocalPath || isLocalUrl) && typeof window === 'undefined') {
+    // Server-side: read from filesystem
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      // Convert paths to absolute filesystem paths
+      let filePath;
+      if (isLocalUrl) {
+        // /datasets/... -> ./public/datasets/...
+        filePath = path.join(process.cwd(), 'public', url);
+      } else {
+        // ./public/datasets/... -> absolute path
+        filePath = path.join(process.cwd(), url);
+      }
+      const fileContent = fs.readFileSync(filePath);
+      return fileContent.buffer.slice(fileContent.byteOffset, fileContent.byteOffset + fileContent.byteLength);
+    } catch (error) {
+      throw new Error(
+        `Failed to read local Parquet ${url}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+  
+  // Client-side or remote: use fetch
+  const headers = isLocalUrl ? {} : getAuthHeaders();
+  
+  const res = await fetch(url, { headers });
   
   if (!res.ok) {
     throw new Error(`Failed to fetch ${url}: ${res.status} ${res.statusText}`);

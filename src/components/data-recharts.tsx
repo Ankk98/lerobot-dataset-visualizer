@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useTime } from "../context/time-context";
+import React, { useMemo } from "react";
+import { ClientOnly } from "./ClientOnly";
+
+// Import Recharts components normally - ClientOnly wrapper will handle SSR
 import {
   LineChart,
   Line,
@@ -16,8 +20,6 @@ type DataGraphProps = {
   data: Array<Array<Record<string, number>>>;
   onChartsReady?: () => void;
 };
-
-import React, { useMemo } from "react";
 
 // Use the same delimiter as the data processing
 const SERIES_NAME_DELIMITER = " | ";
@@ -35,17 +37,28 @@ export const DataRecharts = React.memo(
       }
     }, [onChartsReady]);
 
+    // Wrap in ClientOnly to prevent SSR issues
     return (
-      <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
-        {data.map((group, idx) => (
-          <SingleDataGraph
-            key={idx}
-            data={group}
-            hoveredTime={hoveredTime}
-            setHoveredTime={setHoveredTime}
-          />
-        ))}
-      </div>
+      <ClientOnly
+        fallback={
+          <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
+            <div className="w-full h-80 flex items-center justify-center bg-slate-900 rounded">
+              <p className="text-slate-400">Loading charts...</p>
+            </div>
+          </div>
+        }
+      >
+        <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
+          {data.map((group, idx) => (
+            <SingleDataGraph
+              key={idx}
+              data={group}
+              hoveredTime={hoveredTime}
+              setHoveredTime={setHoveredTime}
+            />
+          ))}
+        </div>
+      </ClientOnly>
     );
   },
 );
